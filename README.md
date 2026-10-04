@@ -55,7 +55,7 @@ A chiptune loop over four chords. Every wall gets its own melody and key from it
 | M | Music on/off |
 | H | High scores (title screen) |
 
-High scores: the top 10 per mode, kept in the browser's local storage. The world tables from Snackman are wired in but switched off until a score server exists: set `GLOBAL_URL` in `src/scores.ts` to turn them on.
+High scores: the top 10 per mode, both worldwide and in your own browser (Up/Down switches between them on the score screen). World scores live in a small [Val Town](https://www.val.town/x/tilmanschieber/rebound-scores) val with a SQLite table; your own scores and settings stay in the browser's local storage, so they still work offline. Games finished while the server can't be reached wait in local storage and are sent the next time the score screen opens.
 
 ## Development
 

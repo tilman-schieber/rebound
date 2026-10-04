@@ -61,10 +61,10 @@ export function rankFor(list: ScoreEntry[], e: ScoreEntry) {
   return at < MAX_SCORES ? at : -1;
 }
 
-// ---------- world scores (a Val Town val, like snackman-scores; none yet) ----------
+// ---------- world scores (a Val Town val: tilmanschieber/rebound-scores) ----------
 
-/** Empty until the score server exists: the game then keeps its scores in the browser only. */
-export const GLOBAL_URL = '';
+/** Empty switches the world tables off: scores then stay in the browser only. */
+export const GLOBAL_URL = 'https://tilmanschieber--01a107c10e6c7512914391d20a4946d1.web.val.run';
 /** A hanging server counts as offline after this long. */
 const TIMEOUT = 5000;
 const PENDING_KEY = 'rebound.pending';
