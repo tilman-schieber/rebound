@@ -2,6 +2,8 @@
 
 A brick-breaking arcade game in the style of the early eighties, built in TypeScript with no runtime dependencies. Runs entirely in the browser. A sibling of [Snackman](https://gh.tschieber.de/snackman/) and [Scales](https://github.com/tilman-schieber/scales): same screen, same font, same high score tables.
 
+**Play:** https://gh.tschieber.de/rebound/
+
 Break every brick, keep the ball off the floor. In ARCADE the ball takes the colour of what it hits, and two colours in a row mix into a power-up that waits in your pocket until you need it.
 
 ## Modes
@@ -56,6 +58,8 @@ A chiptune loop over four chords. Every wall gets its own melody and key from it
 | H | High scores (title screen) |
 
 A gamepad works too: stick or d-pad to move, A or X to launch the ball or use the pocket, B to pause or go back, Start to pause and Select to quit from the pause screen. In the menus A confirms, and on the title screen Y shows the high scores; when typing a name, Up/Down pick a letter, A enters it and B rubs one out.
+
+On phones, drag anywhere on the screen to move the paddle; it moves a little further than your finger. LAUNCH / POWER, START, the arrows (for the menus) and music are below the screen.
 
 High scores: the top 10 per mode, both worldwide and in your own browser (Up/Down switches between them on the score screen). World scores live in a small [Val Town](https://www.val.town/x/tilmanschieber/rebound-scores) val with a SQLite table; your own scores and settings stay in the browser's local storage, so they still work offline. Games finished while the server can't be reached wait in local storage and are sent the next time the score screen opens.
 

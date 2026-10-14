@@ -80,6 +80,8 @@ export interface WorldOptions {
 
 export interface Controls {
   move: -1 | 0 | 1;
+  /** Paddle shift in field pixels from a finger dragging on the screen. */
+  drag?: number;
   /** Launch the ball (Up, Space). */
   launch: boolean;
   /** Use the pocket (Space, Shift, X); launches first if a ball is waiting. */
@@ -271,7 +273,7 @@ export class World {
   }
 
   private stepPlay(c: Controls) {
-    this.movePaddle(c.move);
+    this.movePaddle(c.move, c.drag ?? 0);
     const waiting = this.balls.filter((b) => b.stuck >= 0);
     if (waiting.length && (c.launch || c.use)) waiting.forEach((b) => this.launch(b));
     else if (c.use && this.pocket) this.usePower();
@@ -326,7 +328,12 @@ export class World {
     this.sound(sfx.die);
   }
 
-  private movePaddle(move: number) {
+  private movePaddle(move: number, drag: number) {
+    if (drag) {
+      this.pv = 0;
+      this.px = Math.max(this.pw, Math.min(FW - this.pw, this.px + drag));
+      return;
+    }
     if (!move) this.pv = 0;
     else if (Math.sign(this.pv) === move) this.pv = move * Math.min(PADDLE_MAX_V, Math.abs(this.pv) + PADDLE_ACCEL);
     else this.pv = move * PADDLE_START_V;

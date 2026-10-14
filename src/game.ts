@@ -13,6 +13,8 @@ export interface Input {
   pressed: Set<Action>;
   /** Raw A-Z / 0-9 / Backspace / Enter, for name entry. */
   typed: string[];
+  /** Horizontal finger drag on the screen since the last step, in screen pixels. */
+  dragX: number;
 }
 
 export type Phase = 'title' | 'intro' | 'play' | 'curtain' | 'over' | 'entry' | 'scores' | 'help';
@@ -330,7 +332,7 @@ export class Game {
     }
     const { held } = input;
     const move = held.has('left') === held.has('right') ? 0 : held.has('left') ? -1 : 1;
-    w.update({ move, launch: pressed.has('up') || pressed.has('use'), use: pressed.has('use') });
+    w.update({ move, drag: input.dragX, launch: pressed.has('up') || pressed.has('use'), use: pressed.has('use') });
     this.score += w.gained;
     w.gained = 0;
     this.mixes += w.mixesMade;

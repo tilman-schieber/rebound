@@ -1,14 +1,18 @@
 import { Game, Action, Input } from './game';
 import { render, W, H } from './render';
-import { unlockAudio } from './audio';
+import { unlockAudio, music } from './audio';
+import { setupTouch, setupDrag, TouchButton } from './touch';
 
 const canvas = document.getElementById('screen') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 ctx.imageSmoothingEnabled = false;
 
+const touchPanel = setupTouch(onTouch);
+
 function resize() {
-  const scale = Math.min(innerWidth / W, innerHeight / H);
-  // Whole-number scaling keeps pixels crisp; small windows may need a fractional fit.
+  const reserved = touchPanel ? touchPanel.el.offsetHeight + 8 : 0;
+  const scale = Math.min(innerWidth / W, (innerHeight - reserved) / H);
+  // Whole-number scaling keeps pixels crisp; phones may need a fractional fit.
   const s = scale >= 2 ? Math.floor(scale) : Math.max(0.5, scale);
   canvas.style.width = `${Math.floor(W * s)}px`;
   canvas.style.height = `${Math.floor(H * s)}px`;
@@ -36,9 +40,10 @@ const KEYS: Record<string, Action> = {
 };
 
 const game = new Game();
-const input: Input = { held: new Set(), pressed: new Set(), typed: [] };
+const input: Input = { held: new Set(), pressed: new Set(), typed: [], dragX: 0 };
 /** Keys currently down: e.code -> lower-cased e.key at press time (key-up may report a different key). */
 const heldKeys = new Map<string, string>();
+const touchHeld = new Set<TouchButton>();
 
 /** While typing a name, letters are letters. */
 const actionFor = (key: string) => (game.phase === 'entry' ? ARROWS[key] ?? (key === 'enter' ? undefined : KEYS[key]) : KEYS[key]);
@@ -54,11 +59,28 @@ addEventListener('keydown', (e) => {
   if (!e.repeat && a) input.pressed.add(a);
 });
 addEventListener('keyup', (e) => heldKeys.delete(e.code));
-addEventListener('pointerdown', unlockAudio, { passive: true });
+// Any tap unlocks sound; mobile browsers only allow it after a gesture.
+for (const ev of ['pointerdown', 'pointerup', 'touchend']) addEventListener(ev, unlockAudio, { passive: true });
 addEventListener('blur', () => {
   heldKeys.clear();
   if (game.phase === 'play' && !game.paused) input.pressed.add('start');
 });
+
+function onTouch(b: TouchButton, down: boolean) {
+  unlockAudio();
+  if (!down) return void touchHeld.delete(b);
+  touchHeld.add(b);
+  input.pressed.add(b.a);
+  if (b.typed) input.typed.push(b.typed);
+}
+
+/** The paddle follows a finger dragged anywhere on the screen, a little further than the finger. */
+const DRAG_GAIN = 1.4;
+setupDrag(
+  canvas,
+  (dx) => (input.dragX += dx * (W / canvas.clientWidth) * DRAG_GAIN),
+  () => unlockAudio(),
+);
 
 // Gamepads, in the standard mapping: d-pad or left stick to move, A or X to use a power-up, B pauses and
 // goes back, Start pauses, Select quits from pause. In the menus A confirms; Y opens the scores on
@@ -108,6 +130,7 @@ function refreshHeld() {
     const a = actionFor(key);
     if (a) input.held.add(a);
   }
+  for (const b of touchHeld) input.held.add(b.a);
   pollPads();
 }
 
@@ -125,10 +148,12 @@ function loop(now: number) {
     game.step(input);
     input.pressed.clear();
     input.typed.length = 0;
+    input.dragX = 0;
     acc -= STEP;
     frame++;
   }
   render(ctx, game, frame);
+  touchPanel?.update(music.enabled);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
