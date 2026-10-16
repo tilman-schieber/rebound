@@ -1,6 +1,6 @@
 // One wall in play: paddles, balls, bricks, paint and power-ups. Coordinates are field pixels.
 import type { Mode } from './modes';
-import type { Rng } from './rng';
+import type { Rng } from 'arcade-kit/rng';
 import { sfx } from './audio';
 import { Wall, COLS, ROWS, WHITE, RED, ORANGE, PURPLE, GREEN, STEEL, isMix } from './walls';
 

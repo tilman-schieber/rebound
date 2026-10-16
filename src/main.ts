@@ -1,14 +1,28 @@
 import { Game, Action, Input } from './game';
 import { render, W, H } from './render';
 import { unlockAudio, music } from './audio';
-import { setupTouch, setupDrag, TouchButton } from './touch';
-import { setupHidPad, padAxes } from './hidpad';
+import { setupTouch, setupDrag, TouchButton } from 'arcade-kit/touch';
+import { setupHidPad, padAxes } from 'arcade-kit/hidpad';
 
 const canvas = document.getElementById('screen') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 ctx.imageSmoothingEnabled = false;
 
-const touchPanel = setupTouch(onTouch);
+// On-screen controls for phones and tablets, plus dragging on the game screen to move the paddle.
+const TOUCH_ROWS: TouchButton<Action>[][] = [
+  [
+    { id: 'music', label: '♪', a: 'mute' },
+    { id: 'up', label: '▲', a: 'up' },
+    { id: 'start', label: 'START', a: 'start', typed: 'Enter' },
+  ],
+  [
+    { id: 'left', label: '◀', a: 'left' },
+    { id: 'down', label: '▼', a: 'down' },
+    { id: 'right', label: '▶', a: 'right' },
+  ],
+  [{ id: 'use', label: 'LAUNCH / POWER', a: 'use', wide: true }],
+];
+const touchPanel = setupTouch(TOUCH_ROWS, onTouch);
 setupHidPad();
 
 function resize() {
@@ -45,7 +59,7 @@ const game = new Game();
 const input: Input = { held: new Set(), pressed: new Set(), typed: [], dragX: 0 };
 /** Keys currently down: e.code -> lower-cased e.key at press time (key-up may report a different key). */
 const heldKeys = new Map<string, string>();
-const touchHeld = new Set<TouchButton>();
+const touchHeld = new Set<TouchButton<Action>>();
 
 /** While typing a name, letters are letters. */
 const actionFor = (key: string) => (game.phase === 'entry' ? ARROWS[key] ?? (key === 'enter' ? undefined : KEYS[key]) : KEYS[key]);
@@ -68,7 +82,7 @@ addEventListener('blur', () => {
   if (game.phase === 'play' && !game.paused) input.pressed.add('start');
 });
 
-function onTouch(b: TouchButton, down: boolean) {
+function onTouch(b: TouchButton<Action>, down: boolean) {
   unlockAudio();
   if (!down) return void touchHeld.delete(b);
   touchHeld.add(b);

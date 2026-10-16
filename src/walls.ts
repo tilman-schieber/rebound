@@ -1,6 +1,6 @@
 // The walls: pixel pictures made of bricks, and the eight rows of CLASSIC.
 import type { Mode } from './modes';
-import type { Rng } from './rng';
+import type { Rng } from 'arcade-kit/rng';
 
 /** Brick colours are sets of primaries: red 1, yellow 2, blue 4. White is none, a mix is two. */
 export const WHITE = 0;

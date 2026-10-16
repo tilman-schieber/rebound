@@ -1,66 +1,9 @@
-// Tiny Web Audio chiptune synth: SFX, and music that swells as the wall comes down: a groove whose
-// melody is made up afresh for every wall.
-import { makeRng } from './rng';
+// REBOUND's sounds and music on arcade-kit's chiptune engine: SFX, and music that swells as the wall
+// comes down: a groove whose melody is made up afresh for every wall.
+import { audioNow, arp, createMusic, midiHz, noise, perc, tone, Tune } from 'arcade-kit/audio';
+import { makeRng } from 'arcade-kit/rng';
 
-let ctx: AudioContext | null = null;
-let master: GainNode;
-let noiseBuf: AudioBuffer;
-
-export function unlockAudio() {
-  // iOS: play through the silent switch like a media app (Safari 16.4+).
-  const session = (navigator as { audioSession?: { type: string } }).audioSession;
-  if (session && session.type !== 'playback') session.type = 'playback';
-  if (!ctx) {
-    ctx = new AudioContext();
-    master = ctx.createGain();
-    master.gain.value = 0.22;
-    master.connect(ctx.destination);
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-    const d = noiseBuf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  }
-  if (ctx.state === 'suspended') void ctx.resume();
-}
-
-export const midiHz = (m: number) => 440 * 2 ** ((m - 69) / 12);
-
-function tone(freq: number, dur: number, type: OscillatorType, vol: number, at = 0, slideTo?: number) {
-  if (!ctx) return;
-  const t = at || ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t);
-  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-  g.gain.setValueAtTime(vol, t);
-  g.gain.setValueAtTime(vol, t + dur * 0.7);
-  g.gain.linearRampToValueAtTime(0, t + dur);
-  osc.connect(g).connect(master);
-  osc.start(t);
-  osc.stop(t + dur + 0.01);
-}
-
-function noise(dur: number, vol: number, cutoff: number, at = 0, type: BiquadFilterType = 'lowpass') {
-  if (!ctx) return;
-  const t = at || ctx.currentTime;
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuf;
-  const f = ctx.createBiquadFilter();
-  f.type = type;
-  f.frequency.value = cutoff;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(master);
-  src.start(t, Math.random() * 0.5);
-  src.stop(t + dur);
-}
-
-function arp(notes: number[], step: number, vol = 0.25, type: OscillatorType = 'square') {
-  if (!ctx) return;
-  const t = ctx.currentTime;
-  notes.forEach((n, i) => n && tone(midiHz(n), step, type, vol, t + i * step));
-}
+export { unlockAudio } from 'arcade-kit/audio';
 
 /** Each brick in a run without the paddle rings a step higher. */
 const RUN_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
@@ -98,8 +41,8 @@ export const sfx = {
   powerEnd: () => tone(600, 0.15, 'triangle', 0.25, 0, 300),
   ballLost: () => tone(400, 0.35, 'triangle', 0.35, 0, 80),
   die: () => {
-    if (!ctx) return;
-    const t = ctx.currentTime;
+    const t = audioNow();
+    if (t === null) return;
     for (let k = 0; k < 7; k++) tone(600 - k * 60, 0.1, 'square', 0.18, t + k * 0.09, 450 - k * 50);
     noise(0.6, 0.4, 900, t + 0.6);
   },
@@ -109,26 +52,7 @@ export const sfx = {
 };
 
 // ---------- music ----------
-// Each tune is a loop of time units. Intensity 0-5 comes from how much of the wall is gone:
-// instruments join as it falls.
-
-interface Tune {
-  name: string;
-  /** Seconds per unit at tempo 1. */
-  unit: number;
-  length: number;
-  /** Schedule whatever sounds at unit i (already wrapped into the loop). */
-  play(i: number, t: number, lv: number, tr: number, unitSec: number): void;
-}
-
-const perc = {
-  snare: (t: number, vol: number) => noise(0.05, vol, 7000, t, 'highpass'),
-  hat: (t: number, vol: number) => noise(0.03, vol, 9000, t, 'highpass'),
-  kick: (t: number, vol: number) => {
-    tone(120, 0.12, 'sine', vol, t, 40);
-    noise(0.04, vol * 0.4, 300, t);
-  },
-};
+// Intensity 0-5 comes from how much of the wall is gone: instruments join as it falls.
 
 // --- Groove: four bars of sixteenths over Am F C G. The melody comes from the wall's seed.
 const CHORDS = [
@@ -189,61 +113,12 @@ const GROOVE: Tune = {
 export const TUNES = [GROOVE];
 export const TUNE = { GROOVE: 0 } as const;
 
-let musicOn = true;
-let playing = false;
-let tune = 0;
-let unit = 0;
-let nextTime = 0;
-let timer: number | undefined;
-let transpose = 0;
-let intensity = 0;
-let tempo = 1;
+const player = createMusic(TUNES);
 
-function schedule() {
-  if (!ctx) return;
-  const tn = TUNES[tune];
-  while (nextTime < ctx.currentTime + 0.12) {
-    const u = tn.unit / tempo;
-    tn.play(unit % tn.length, nextTime, intensity, transpose, u);
-    unit++;
-    nextTime += u;
-  }
-}
-
-export const music = {
-  /** Start (or keep playing) a tune; switching tunes starts it from the top. */
-  play(which = tune, restart = false) {
-    if (which !== tune || restart) {
-      this.halt();
-      tune = which;
-      unit = 0;
-    }
-    playing = true;
-    if (!ctx || !musicOn || timer !== undefined) return;
-    nextTime = ctx.currentTime + 0.05;
-    timer = window.setInterval(schedule, 25);
-  },
-  resume() {
-    if (playing) this.play();
-  },
-  stop() {
-    playing = false;
-    this.halt();
-  },
-  halt() {
-    if (timer !== undefined) clearInterval(timer);
-    timer = undefined;
-  },
+export const music = Object.assign(player, {
   /** Semitones up or down from A minor, kept within a tritone. */
   setKey(semis: number) {
-    transpose = ((semis + 18) % 12) - 6;
-  },
-  setIntensity(lv: number) {
-    intensity = lv;
-  },
-  /** Tempo multiplier. */
-  setTempo(mult: number) {
-    tempo = mult;
+    player.setTranspose(((semis + 18) % 12) - 6);
   },
   /** The groove's melody for this wall. */
   setMelody(seed: number) {
@@ -253,22 +128,4 @@ export const music = {
   setPower(on: boolean) {
     power = on;
   },
-  toggle() {
-    musicOn = !musicOn;
-    if (!musicOn) this.halt();
-    else if (playing) this.play();
-    return musicOn;
-  },
-  set enabled(on: boolean) {
-    if (on !== musicOn) this.toggle();
-  },
-  get enabled() {
-    return musicOn;
-  },
-  get running() {
-    return timer !== undefined;
-  },
-  get tune() {
-    return tune;
-  },
-};
+});
